@@ -6,7 +6,6 @@ import zipfile
 import re
 import os.path
 import bs4
-import hashlib
 from html2xhtml import html2xhtml
 
 def get_archive_xhtml(archive):
@@ -140,13 +139,13 @@ def list_titles(xhtml):
 	soup = bs4.BeautifulSoup(xhtml, 'lxml')
 	return [unicode(h1.text) for h1 in soup.html.body.find_all('h1')]
 
+guide_url = 'http://zsh.sourceforge.net/Guide/'
 archive = open('zshguide_html.tar.gz', 'rb').read()
-uuid = hashlib.sha1(archive).hexdigest()
 contents_map = get_archive_xhtml(archive)
 titles_map = {outname: list_titles(xhtml) for (outname, xhtml) in contents_map.iteritems()}
 epub_contents = [(['OEBPS', outname], xhtml) for (outname, xhtml) in contents_map.iteritems()]
-epub_contents.append((['OEBPS', 'toc.ncx'], create_ncx(titles_map, uuid)))
-epub_contents.append((['OEBPS', 'content.opf'], create_opf(titles_map, get_author(contents_map), uuid)))
+epub_contents.append((['OEBPS', 'toc.ncx'], create_ncx(titles_map, guide_url)))
+epub_contents.append((['OEBPS', 'content.opf'], create_opf(titles_map, get_author(contents_map), guide_url)))
 epub_contents.append((['mimetype'], create_mime()))
 epub_contents.append((['META-INF', 'container.xml'], create_container()))
 
