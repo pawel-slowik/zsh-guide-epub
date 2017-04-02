@@ -141,8 +141,8 @@ def create_container():
 	return unicode(soup)
 
 def get_author(contents_map):
-	# TODO
-	return 'Peter Stephenson'
+	soup = bs4.BeautifulSoup(contents_map['zshguide.html'], 'lxml')
+	return unicode(soup.html.body.h2.text)
 
 def list_titles(xhtml):
 	soup = bs4.BeautifulSoup(xhtml, 'lxml')
