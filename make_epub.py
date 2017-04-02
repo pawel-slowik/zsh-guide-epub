@@ -9,9 +9,26 @@ import bs4
 import urllib2
 from html2xhtml import html2xhtml
 
-def get_archive_xhtml(archive):
+class Chapter(object):
+
+	def __init__(self, filename, html):
+		self.xhtml = html2xhtml(html)
+		self.outname = os.path.basename(filename)
+		match = re.search(r'([0-9]+)\.html$', self.outname)
+		self.number = 0 if match is None else int(match.group(1))
+		soup = bs4.BeautifulSoup(self.xhtml, 'lxml')
+		body = soup.html.body
+		self.title = unicode(body.find_all('h1')[-1].text)
+		if self.number == 0:
+			self.book_title = unicode(body.find_all('h1')[0].text)
+			self.book_author = unicode(body.h2.text)
+		else:
+			self.book_title = None
+			self.book_author = None
+
+def list_archive_chapters(archive):
 	tar = tarfile.open(fileobj = StringIO.StringIO(archive))
-	name_xhtml_map = {}
+	chapters = []
 	for tarinfo in tar:
 		if not tarinfo.isreg():
 			continue
@@ -20,13 +37,14 @@ def get_archive_xhtml(archive):
 			tarinfo.name
 		):
 			continue
-		xhtml = html2xhtml(tar.extractfile(tarinfo).read())
-		outname = os.path.basename(tarinfo.name)
-		name_xhtml_map[outname] = xhtml
+		chapters.append(Chapter(
+			tarinfo.name,
+			tar.extractfile(tarinfo).read()
+		))
 	tar.close()
-	return name_xhtml_map
+	return chapters
 
-def create_ncx(titles_map, uuid):
+def create_ncx(chapters, uuid):
 	soup = bs4.BeautifulSoup('', 'lxml-xml')
 	doctype = bs4.Doctype.for_name_and_ids(
 		'ncx',
@@ -57,28 +75,27 @@ def create_ncx(titles_map, uuid):
 
 	title = soup.new_tag('docTitle')
 	text = soup.new_tag('text')
-	text.append(titles_map[sorted(titles_map.keys())[0]][0])
+	text.append(get_book_title(chapters))
 	title.append(text)
 	ncx.append(title)
 
 	nav_map = soup.new_tag('navMap')
-	n = 1
-	for k in sorted(titles_map.keys()):
+	for c in chapters:
+		nav_number = c.number + 1
 		nav_point = soup.new_tag('navPoint')
-		nav_point['id'] = "navpoint-%d" % n
-		nav_point['playOrder'] = n
+		nav_point['id'] = "navpoint-%d" % nav_number
+		nav_point['playOrder'] = nav_number
 		nav_map.append(nav_point)
 		nav_label = soup.new_tag('navLabel')
 		nav_text = soup.new_tag('text')
-		nav_text.append(titles_map[k][-1])
+		nav_text.append(c.title)
 		nav_label.append(nav_text)
 		nav_point.append(nav_label)
-		nav_point.append(soup.new_tag('content', src = k))
-		n += 1
+		nav_point.append(soup.new_tag('content', src = c.outname))
 	ncx.append(nav_map)
 	return unicode(soup)
 
-def create_opf(titles_map, author, uuid):
+def create_opf(chapters, uuid):
 	soup = bs4.BeautifulSoup('', 'lxml-xml')
 	package_attrs = {
 		'xmlns': "http://www.idpf.org/2007/opf",
@@ -91,9 +108,9 @@ def create_opf(titles_map, author, uuid):
 
 	metadata = soup.new_tag('metadata')
 	title = soup.new_tag('dc:title')
-	title.append(titles_map[sorted(titles_map.keys())[0]][0])
+	title.append(get_book_title(chapters))
 	creator = soup.new_tag('dc:creator')
-	creator.append(author)
+	creator.append(get_book_author(chapters))
 	identifier = soup.new_tag('dc:identifier')
 	identifier['id'] = "bookid"
 	identifier.append(uuid)
@@ -111,11 +128,11 @@ def create_opf(titles_map, author, uuid):
 	}
 	item_ncx = soup.new_tag('item', **item_ncx_attrs)
 	manifest.append(item_ncx)
-	for k in sorted(titles_map.keys()):
-		file_id = os.path.splitext(k)[0]
+	for c in chapters:
+		file_id = os.path.splitext(c.outname)[0]
 		item_attrs = {
 			'id': file_id,
-			'href': k,
+			'href': c.outname,
 			'media-type': "application/xhtml+xml",
 		}
 		item = soup.new_tag('item', **item_attrs)
@@ -148,34 +165,27 @@ def create_container():
 	soup.append(container)
 	return unicode(soup)
 
-def get_author(contents_map):
-	soup = bs4.BeautifulSoup(contents_map['zshguide.html'], 'lxml')
-	return unicode(soup.html.body.h2.text)
+def get_book_title(chapters):
+	titles = [c.book_title for c in chapters if c.book_title is not None]
+	return ' '.join(set(titles))
 
-def list_titles(xhtml):
-	soup = bs4.BeautifulSoup(xhtml, 'lxml')
-	return [unicode(h1.text) for h1 in soup.html.body.find_all('h1')]
+def get_book_author(chapters):
+	authors = [c.book_author for c in chapters if c.book_author is not None]
+	return ' '.join(set(authors))
 
 def main():
 	guide_url = 'http://zsh.sourceforge.net/Guide/'
 	tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
 	archive = urllib2.urlopen(tarball_url).read()
-	contents_map = get_archive_xhtml(archive)
-	titles_map = {
-		outname: list_titles(xhtml)
-		for (outname, xhtml) in contents_map.iteritems()
-	}
-	epub_contents = [
-		(['OEBPS', outname], xhtml)
-		for (outname, xhtml) in contents_map.iteritems()
-	]
+	chapters = list_archive_chapters(archive)
+	epub_contents = [(['OEBPS', c.outname], c.xhtml) for c in chapters]
 	epub_contents.append((
 		['OEBPS', 'toc.ncx'],
-		create_ncx(titles_map, guide_url)
+		create_ncx(chapters, guide_url)
 	))
 	epub_contents.append((
 		['OEBPS', 'content.opf'],
-		create_opf(titles_map, get_author(contents_map), guide_url)
+		create_opf(chapters, guide_url)
 	))
 	epub_contents.append((['mimetype'], create_mime()))
 	epub_contents.append((
