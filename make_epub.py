@@ -139,16 +139,20 @@ def list_titles(xhtml):
 	soup = bs4.BeautifulSoup(xhtml, 'lxml')
 	return [unicode(h1.text) for h1 in soup.html.body.find_all('h1')]
 
-guide_url = 'http://zsh.sourceforge.net/Guide/'
-archive = open('zshguide_html.tar.gz', 'rb').read()
-contents_map = get_archive_xhtml(archive)
-titles_map = {outname: list_titles(xhtml) for (outname, xhtml) in contents_map.iteritems()}
-epub_contents = [(['OEBPS', outname], xhtml) for (outname, xhtml) in contents_map.iteritems()]
-epub_contents.append((['OEBPS', 'toc.ncx'], create_ncx(titles_map, guide_url)))
-epub_contents.append((['OEBPS', 'content.opf'], create_opf(titles_map, get_author(contents_map), guide_url)))
-epub_contents.append((['mimetype'], create_mime()))
-epub_contents.append((['META-INF', 'container.xml'], create_container()))
+def main():
+	guide_url = 'http://zsh.sourceforge.net/Guide/'
+	archive = open('zshguide_html.tar.gz', 'rb').read()
+	contents_map = get_archive_xhtml(archive)
+	titles_map = {outname: list_titles(xhtml) for (outname, xhtml) in contents_map.iteritems()}
+	epub_contents = [(['OEBPS', outname], xhtml) for (outname, xhtml) in contents_map.iteritems()]
+	epub_contents.append((['OEBPS', 'toc.ncx'], create_ncx(titles_map, guide_url)))
+	epub_contents.append((['OEBPS', 'content.opf'], create_opf(titles_map, get_author(contents_map), guide_url)))
+	epub_contents.append((['mimetype'], create_mime()))
+	epub_contents.append((['META-INF', 'container.xml'], create_container()))
 
-epub = zipfile.ZipFile('zsh-guide.epub', 'w')
-for filename, contents in epub_contents:
-	epub.writestr(os.path.join(*filename), contents.encode('utf-8'))
+	epub = zipfile.ZipFile('zsh-guide.epub', 'w')
+	for filename, contents in epub_contents:
+		epub.writestr(os.path.join(*filename), contents.encode('utf-8'))
+
+if __name__ == '__main__':
+	main()
