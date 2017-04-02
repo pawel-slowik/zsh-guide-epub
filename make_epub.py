@@ -15,7 +15,10 @@ def get_archive_xhtml(archive):
 	for tarinfo in tar:
 		if not tarinfo.isreg():
 			continue
-		if not re.search(r'zshguide([0-9]{2}){0,1}\.html$', tarinfo.name):
+		if not re.search(
+			r'zshguide([0-9]{2}){0,1}\.html$',
+			tarinfo.name
+		):
 			continue
 		xhtml = html2xhtml(tar.extractfile(tarinfo).read())
 		outname = os.path.basename(tarinfo.name)
@@ -31,7 +34,11 @@ def create_ncx(titles_map, uuid):
 		'http://www.daisy.org/z3986/2005/ncx-2005-1.dtd'
 	)
 	soup.append(doctype)
-	ncx = soup.new_tag('ncx', xmlns = "http://www.daisy.org/z3986/2005/ncx/", version = "2005-1")
+	ncx = soup.new_tag(
+		'ncx',
+		xmlns = "http://www.daisy.org/z3986/2005/ncx/",
+		version = "2005-1"
+	)
 	soup.append(ncx)
 
 	head = soup.new_tag('head')
@@ -154,12 +161,26 @@ def main():
 	tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
 	archive = urllib2.urlopen(tarball_url).read()
 	contents_map = get_archive_xhtml(archive)
-	titles_map = {outname: list_titles(xhtml) for (outname, xhtml) in contents_map.iteritems()}
-	epub_contents = [(['OEBPS', outname], xhtml) for (outname, xhtml) in contents_map.iteritems()]
-	epub_contents.append((['OEBPS', 'toc.ncx'], create_ncx(titles_map, guide_url)))
-	epub_contents.append((['OEBPS', 'content.opf'], create_opf(titles_map, get_author(contents_map), guide_url)))
+	titles_map = {
+		outname: list_titles(xhtml)
+		for (outname, xhtml) in contents_map.iteritems()
+	}
+	epub_contents = [
+		(['OEBPS', outname], xhtml)
+		for (outname, xhtml) in contents_map.iteritems()
+	]
+	epub_contents.append((
+		['OEBPS', 'toc.ncx'],
+		create_ncx(titles_map, guide_url)
+	))
+	epub_contents.append((
+		['OEBPS', 'content.opf'],
+		create_opf(titles_map, get_author(contents_map), guide_url)
+	))
 	epub_contents.append((['mimetype'], create_mime()))
-	epub_contents.append((['META-INF', 'container.xml'], create_container()))
+	epub_contents.append((
+		['META-INF', 'container.xml'], create_container()
+	))
 
 	epub = zipfile.ZipFile('zsh-guide.epub', 'w')
 	for filename, contents in epub_contents:
