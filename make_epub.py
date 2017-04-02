@@ -6,6 +6,7 @@ import zipfile
 import re
 import os.path
 import bs4
+import urllib2
 from html2xhtml import html2xhtml
 
 def get_archive_xhtml(archive):
@@ -150,7 +151,8 @@ def list_titles(xhtml):
 
 def main():
 	guide_url = 'http://zsh.sourceforge.net/Guide/'
-	archive = open('zshguide_html.tar.gz', 'rb').read()
+	tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
+	archive = urllib2.urlopen(tarball_url).read()
 	contents_map = get_archive_xhtml(archive)
 	titles_map = {outname: list_titles(xhtml) for (outname, xhtml) in contents_map.iteritems()}
 	epub_contents = [(['OEBPS', outname], xhtml) for (outname, xhtml) in contents_map.iteritems()]
