@@ -42,6 +42,7 @@ def list_archive_chapters(archive):
 			tar.extractfile(tarinfo).read()
 		))
 	tar.close()
+	chapters.sort(key = lambda x: x.number)
 	return chapters
 
 def create_ncx(chapters, uuid):
