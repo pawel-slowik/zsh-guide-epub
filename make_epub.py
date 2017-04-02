@@ -123,13 +123,22 @@ def create_mime():
 	return 'application/epub+zip'
 
 def create_container():
-	return '''<?xml version="1.0"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-<rootfiles>
-<rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml" />
-</rootfiles>
-</container>
-'''
+	soup = bs4.BeautifulSoup('', 'lxml-xml')
+	container_attrs = {
+		'xmlns': "urn:oasis:names:tc:opendocument:xmlns:container",
+		'version': "1.0",
+	}
+	container = soup.new_tag('container', **container_attrs)
+	rootfiles = soup.new_tag('rootfiles')
+	rootfile_attrs = {
+		'full-path': "OEBPS/content.opf",
+		'media-type': "application/oebps-package+xml",
+	}
+	rootfile = soup.new_tag('rootfile', **rootfile_attrs)
+	rootfiles.append(rootfile)
+	container.append(rootfiles)
+	soup.append(container)
+	return unicode(soup)
 
 def get_author(contents_map):
 	# TODO
