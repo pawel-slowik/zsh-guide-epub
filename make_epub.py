@@ -94,7 +94,7 @@ def create_ncx(chapters, uuid):
 		nav_point.append(nav_label)
 		nav_point.append(soup.new_tag('content', src = c.outname))
 	ncx.append(nav_map)
-	return unicode(soup)
+	return 'OEBPS/toc.ncx', unicode(soup)
 
 def create_opf(chapters, uuid):
 	soup = bs4.BeautifulSoup('', 'lxml-xml')
@@ -143,10 +143,10 @@ def create_opf(chapters, uuid):
 
 	for e in metadata, manifest, spine:
 		package.append(e)
-	return unicode(soup)
+	return 'OEBPS/content.opf', unicode(soup)
 
 def create_mime():
-	return 'application/epub+zip'
+	return 'mimetype', 'application/epub+zip'
 
 def create_container():
 	soup = bs4.BeautifulSoup('', 'lxml-xml')
@@ -164,7 +164,7 @@ def create_container():
 	rootfiles.append(rootfile)
 	container.append(rootfiles)
 	soup.append(container)
-	return unicode(soup)
+	return 'META-INF/container.xml', unicode(soup)
 
 def get_book_title(chapters):
 	titles = [c.book_title for c in chapters if c.book_title is not None]
@@ -180,18 +180,10 @@ def main():
 	archive = urllib2.urlopen(tarball_url).read()
 	chapters = list_archive_chapters(archive)
 	epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in chapters]
-	epub_contents.append((
-		'OEBPS/toc.ncx',
-		create_ncx(chapters, guide_url)
-	))
-	epub_contents.append((
-		'OEBPS/content.opf',
-		create_opf(chapters, guide_url)
-	))
-	epub_contents.append(('mimetype', create_mime()))
-	epub_contents.append((
-		'META-INF/container.xml', create_container()
-	))
+	epub_contents.append(create_ncx(chapters, guide_url))
+	epub_contents.append(create_opf(chapters, guide_url))
+	epub_contents.append(create_mime())
+	epub_contents.append(create_container())
 
 	epub = zipfile.ZipFile('zsh-guide.epub', 'w')
 	for filename, contents in epub_contents:
