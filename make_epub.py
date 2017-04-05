@@ -179,23 +179,23 @@ def main():
 	tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
 	archive = urllib2.urlopen(tarball_url).read()
 	chapters = list_archive_chapters(archive)
-	epub_contents = [(['OEBPS', c.outname], c.xhtml) for c in chapters]
+	epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in chapters]
 	epub_contents.append((
-		['OEBPS', 'toc.ncx'],
+		'OEBPS/toc.ncx',
 		create_ncx(chapters, guide_url)
 	))
 	epub_contents.append((
-		['OEBPS', 'content.opf'],
+		'OEBPS/content.opf',
 		create_opf(chapters, guide_url)
 	))
-	epub_contents.append((['mimetype'], create_mime()))
+	epub_contents.append(('mimetype', create_mime()))
 	epub_contents.append((
-		['META-INF', 'container.xml'], create_container()
+		'META-INF/container.xml', create_container()
 	))
 
 	epub = zipfile.ZipFile('zsh-guide.epub', 'w')
 	for filename, contents in epub_contents:
-		epub.writestr(os.path.join(*filename), contents.encode('utf-8'))
+		epub.writestr(filename, contents.encode('utf-8'))
 
 if __name__ == '__main__':
 	main()
