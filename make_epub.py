@@ -182,12 +182,18 @@ def main():
 	epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in chapters]
 	epub_contents.append(create_ncx(chapters, guide_url))
 	epub_contents.append(create_opf(chapters, guide_url))
-	epub_contents.append(create_mime())
+	# the first file in the archive must be the mimetype file
+	epub_contents.insert(0, create_mime())
 	epub_contents.append(create_container())
 
 	epub = zipfile.ZipFile('zsh-guide.epub', 'w')
 	for filename, contents in epub_contents:
-		epub.writestr(filename, contents.encode('utf-8'))
+		compress = filename != 'mimetype'
+		ct = zipfile.ZIP_DEFLATED if compress else zipfile.ZIP_STORED
+		# the mimetype file must not be compressed; this allows non-ZIP
+		# utilities to discover the mimetype by reading the raw bytes
+		# from the EPUB file
+		epub.writestr(filename, contents.encode('utf-8'), ct)
 
 if __name__ == '__main__':
 	main()
