@@ -138,7 +138,12 @@ def create_opf(chapters, uuid):
 		}
 		item = soup.new_tag('item', **item_attrs)
 		manifest.append(item)
-		ref = soup.new_tag('itemref', idref = file_id)
+		ref_attrs = {
+			'idref': file_id,
+		}
+		if c.number == 0:
+			ref_attrs['linear'] = 'no'
+		ref = soup.new_tag('itemref', **ref_attrs)
 		spine.append(ref)
 
 	for e in metadata, manifest, spine:
