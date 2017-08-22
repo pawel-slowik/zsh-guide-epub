@@ -14,7 +14,7 @@ doctypes = {
 	),
 }
 
-def html2xhtml(html, version = '1.1'):
+def html2xhtml(html, version='1.1'):
 	soup = bs4.BeautifulSoup(html, "lxml")
 	set_doctype(soup, version)
 	set_xml_namespace(soup)
@@ -93,23 +93,23 @@ def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
 		'-i',
-		dest = 'input_file',
-		required = True,
-		help = 'input file'
+		dest='input_file',
+		required=True,
+		help='input file'
 	)
 	parser.add_argument(
 		'-o',
-		dest = 'output_file',
-		required = True,
-		help = 'output file'
+		dest='output_file',
+		required=True,
+		help='output file'
 	)
 	parser.add_argument(
 		'-x',
-		dest = 'version',
-		required = False,
-		choices = doctypes.keys(),
-		default = '1.1',
-		help = 'XHTML version'
+		dest='version',
+		required=False,
+		choices=doctypes.keys(),
+		default='1.1',
+		help='XHTML version'
 	)
 	args = parser.parse_args()
 	html = open(args.input_file, 'r').read()

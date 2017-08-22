@@ -27,7 +27,7 @@ class Chapter(object):
 			self.book_author = None
 
 def list_archive_chapters(archive):
-	tar = tarfile.open(fileobj = StringIO.StringIO(archive))
+	tar = tarfile.open(fileobj=StringIO.StringIO(archive))
 	chapters = []
 	for tarinfo in tar:
 		if not tarinfo.isreg():
@@ -42,7 +42,7 @@ def list_archive_chapters(archive):
 			tar.extractfile(tarinfo).read()
 		))
 	tar.close()
-	chapters.sort(key = lambda x: x.number)
+	chapters.sort(key=lambda x: x.number)
 	return chapters
 
 def create_ncx(chapters, uuid):
@@ -55,8 +55,8 @@ def create_ncx(chapters, uuid):
 	soup.append(doctype)
 	ncx = soup.new_tag(
 		'ncx',
-		xmlns = "http://www.daisy.org/z3986/2005/ncx/",
-		version = "2005-1"
+		xmlns="http://www.daisy.org/z3986/2005/ncx/",
+		version="2005-1"
 	)
 	soup.append(ncx)
 
@@ -92,7 +92,7 @@ def create_ncx(chapters, uuid):
 		nav_text.append(c.title)
 		nav_label.append(nav_text)
 		nav_point.append(nav_label)
-		nav_point.append(soup.new_tag('content', src = c.outname))
+		nav_point.append(soup.new_tag('content', src=c.outname))
 	ncx.append(nav_map)
 	return 'OEBPS/toc.ncx', unicode(soup)
 
@@ -121,7 +121,7 @@ def create_opf(chapters, uuid):
 		metadata.append(e)
 
 	manifest = soup.new_tag('manifest')
-	spine = soup.new_tag('spine', toc = "ncx")
+	spine = soup.new_tag('spine', toc="ncx")
 	item_ncx_attrs = {
 		'id': "ncx",
 		'href': "toc.ncx",
