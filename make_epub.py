@@ -5,8 +5,8 @@ import tarfile
 import zipfile
 import re
 import os.path
-import bs4
 import urllib2
+import bs4
 from html2xhtml import html2xhtml
 
 class Chapter(object):
