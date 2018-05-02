@@ -1,11 +1,11 @@
-#!/usr/bin/env python2.7
-from __future__ import print_function
-import StringIO
+#!/usr/bin/env python3
+
+import io
 import tarfile
 import zipfile
 import re
 import os.path
-import urllib2
+import urllib.request
 import bs4
 from html2xhtml import html2xhtml
 
@@ -18,16 +18,16 @@ class Chapter(object):
 		self.number = 0 if match is None else int(match.group(1))
 		soup = bs4.BeautifulSoup(self.xhtml, 'lxml')
 		body = soup.html.body
-		self.title = unicode(body.find_all('h1')[-1].text)
+		self.title = str(body.find_all('h1')[-1].text)
 		if self.number == 0:
-			self.book_title = unicode(body.find_all('h1')[0].text)
-			self.book_author = unicode(body.h2.text)
+			self.book_title = str(body.find_all('h1')[0].text)
+			self.book_author = str(body.h2.text)
 		else:
 			self.book_title = None
 			self.book_author = None
 
 def list_archive_chapters(archive):
-	tar = tarfile.open(fileobj=StringIO.StringIO(archive))
+	tar = tarfile.open(fileobj=io.BytesIO(archive))
 	chapters = []
 	for tarinfo in tar:
 		if not tarinfo.isreg():
@@ -94,7 +94,7 @@ def create_ncx(chapters, uuid):
 		nav_point.append(nav_label)
 		nav_point.append(soup.new_tag('content', src=c.outname))
 	ncx.append(nav_map)
-	return 'OEBPS/toc.ncx', unicode(soup)
+	return 'OEBPS/toc.ncx', str(soup)
 
 def create_opf(chapters, uuid):
 	soup = bs4.BeautifulSoup('', 'lxml-xml')
@@ -148,7 +148,7 @@ def create_opf(chapters, uuid):
 
 	for e in metadata, manifest, spine:
 		package.append(e)
-	return 'OEBPS/content.opf', unicode(soup)
+	return 'OEBPS/content.opf', str(soup)
 
 def create_mime():
 	return 'mimetype', 'application/epub+zip'
@@ -169,7 +169,7 @@ def create_container():
 	rootfiles.append(rootfile)
 	container.append(rootfiles)
 	soup.append(container)
-	return 'META-INF/container.xml', unicode(soup)
+	return 'META-INF/container.xml', str(soup)
 
 def get_book_title(chapters):
 	titles = [c.book_title for c in chapters if c.book_title is not None]
@@ -182,7 +182,7 @@ def get_book_author(chapters):
 def main():
 	guide_url = 'http://zsh.sourceforge.net/Guide/'
 	tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
-	archive = urllib2.urlopen(tarball_url).read()
+	archive = urllib.request.urlopen(tarball_url).read()
 	chapters = list_archive_chapters(archive)
 	epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in chapters]
 	epub_contents.append(create_ncx(chapters, guide_url))

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 import bs4
 
 doctypes = {
@@ -23,7 +23,7 @@ def html2xhtml(html, version='1.1'):
 	if version == '1.1':
 		convert_name_to_id(soup)
 	wrap_body(soup)
-	return unicode(soup)
+	return str(soup)
 
 def set_doctype(soup, version):
 	if version not in doctypes:
@@ -107,7 +107,7 @@ def main():
 		'-x',
 		dest='version',
 		required=False,
-		choices=doctypes.keys(),
+		choices=list(doctypes.keys()),
 		default='1.1',
 		help='XHTML version'
 	)
