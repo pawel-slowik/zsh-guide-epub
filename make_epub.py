@@ -9,7 +9,7 @@ import urllib.request
 import bs4
 from html2xhtml import html2xhtml
 
-class Chapter(object):
+class Chapter():
 
     def __init__(self, filename, html):
         self.xhtml = html2xhtml(html)
