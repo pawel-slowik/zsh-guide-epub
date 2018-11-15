@@ -33,8 +33,8 @@ def list_archive_chapters(archive):
         if not tarinfo.isreg():
             continue
         if not re.search(
-            r'zshguide([0-9]{2}){0,1}\.html$',
-            tarinfo.name
+                r'zshguide([0-9]{2}){0,1}\.html$',
+                tarinfo.name
         ):
             continue
         chapters.append(Chapter(
