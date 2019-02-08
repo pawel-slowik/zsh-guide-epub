@@ -6,12 +6,13 @@ import zipfile
 import re
 import os.path
 import urllib.request
+from typing import Tuple, Optional, Iterable
 import bs4
 from html2xhtml import html2xhtml
 
 class Chapter():
 
-    def __init__(self, filename, html):
+    def __init__(self, filename: str, html: bytes) -> None:
         self.xhtml = html2xhtml(html)
         self.outname = os.path.basename(filename)
         match = re.search(r'([0-9]+)\.html$', self.outname)
@@ -19,6 +20,8 @@ class Chapter():
         soup = bs4.BeautifulSoup(self.xhtml, 'lxml')
         body = soup.html.body
         self.title = str(body.find_all('h1')[-1].text)
+        self.book_title: Optional[str]
+        self.book_author: Optional[str]
         if self.number == 0:
             self.book_title = str(body.find_all('h1')[0].text)
             self.book_author = str(body.h2.text)
@@ -26,7 +29,7 @@ class Chapter():
             self.book_title = None
             self.book_author = None
 
-def list_archive_chapters(archive):
+def list_archive_chapters(archive: bytes) -> Iterable[Chapter]:
     tar = tarfile.open(fileobj=io.BytesIO(archive))
     chapters = []
     for tarinfo in tar:
@@ -45,7 +48,7 @@ def list_archive_chapters(archive):
     chapters.sort(key=lambda x: x.number)
     return chapters
 
-def create_ncx(chapters, uuid):
+def create_ncx(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
     soup = bs4.BeautifulSoup('', 'lxml-xml')
     doctype = bs4.Doctype.for_name_and_ids(
         'ncx',
@@ -96,7 +99,7 @@ def create_ncx(chapters, uuid):
     ncx.append(nav_map)
     return 'OEBPS/toc.ncx', str(soup)
 
-def create_opf(chapters, uuid):
+def create_opf(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
     soup = bs4.BeautifulSoup('', 'lxml-xml')
     package_attrs = {
         'xmlns': "http://www.idpf.org/2007/opf",
@@ -150,10 +153,10 @@ def create_opf(chapters, uuid):
         package.append(element)
     return 'OEBPS/content.opf', str(soup)
 
-def create_mime():
+def create_mime() -> Tuple[str, str]:
     return 'mimetype', 'application/epub+zip'
 
-def create_container():
+def create_container() -> Tuple[str, str]:
     soup = bs4.BeautifulSoup('', 'lxml-xml')
     container_attrs = {
         'xmlns': "urn:oasis:names:tc:opendocument:xmlns:container",
@@ -171,15 +174,15 @@ def create_container():
     soup.append(container)
     return 'META-INF/container.xml', str(soup)
 
-def get_book_title(chapters):
+def get_book_title(chapters: Iterable[Chapter]) -> str:
     titles = [c.book_title for c in chapters if c.book_title is not None]
     return ' '.join(set(titles))
 
-def get_book_author(chapters):
+def get_book_author(chapters: Iterable[Chapter]) -> str:
     authors = [c.book_author for c in chapters if c.book_author is not None]
     return ' '.join(set(authors))
 
-def main():
+def main() -> None:
     guide_url = 'http://zsh.sourceforge.net/Guide/'
     tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
     archive = urllib.request.urlopen(tarball_url).read()

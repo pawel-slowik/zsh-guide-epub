@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import Union, Any
 import bs4
 
 DOCTYPES = {
@@ -14,7 +15,7 @@ DOCTYPES = {
     ),
 }
 
-def html2xhtml(html, version='1.1'):
+def html2xhtml(html: Union[str, bytes], version: str = '1.1') -> str:
     soup = bs4.BeautifulSoup(html, "lxml")
     set_doctype(soup, version)
     set_xml_namespace(soup)
@@ -25,7 +26,7 @@ def html2xhtml(html, version='1.1'):
     wrap_body(soup)
     return str(soup)
 
-def set_doctype(soup, version):
+def set_doctype(soup: bs4.BeautifulSoup, version: str) -> None:
     if version not in DOCTYPES:
         raise ValueError('unsupported version: %s' % version)
     new_doctype = bs4.Doctype.for_name_and_ids(*DOCTYPES[version])
@@ -34,12 +35,12 @@ def set_doctype(soup, version):
             item.replaceWith('')
     soup.insert(0, new_doctype)
 
-def set_xml_namespace(soup):
+def set_xml_namespace(soup: bs4.BeautifulSoup) -> None:
     soup.html['xmlns'] = 'http://www.w3.org/1999/xhtml'
 
-def set_charset(soup):
+def set_charset(soup: bs4.BeautifulSoup) -> None:
 
-    def element_is_meta_charset(element):
+    def element_is_meta_charset(element: Any) -> bool:
         if element.name != 'meta':
             return False
         if element.has_attr('charset'):
@@ -57,9 +58,9 @@ def set_charset(soup):
     }
     soup.html.head.append(soup.new_tag('meta', **meta_attrs))
 
-def remove_empty_paragraphs(soup):
+def remove_empty_paragraphs(soup: bs4.BeautifulSoup) -> None:
 
-    def is_empty(tag):
+    def is_empty(tag: Any) -> bool:
         for child in tag.children:
             if isinstance(child, bs4.element.Tag):
                 return False
@@ -74,13 +75,13 @@ def remove_empty_paragraphs(soup):
         if is_empty(element):
             element.decompose()
 
-def convert_name_to_id(soup):
+def convert_name_to_id(soup: bs4.BeautifulSoup) -> None:
     for anchor in soup.html.find_all('a'):
         if anchor.has_attr('name'):
             anchor['id'] = anchor['name']
             del anchor['name']
 
-def wrap_body(soup):
+def wrap_body(soup: bs4.BeautifulSoup) -> None:
     wrapper = soup.new_tag('div')
     saved = list(soup.body.children)
     soup.body.clear()
@@ -88,7 +89,7 @@ def wrap_body(soup):
     for saved_element in saved:
         wrapper.append(saved_element)
 
-def main():
+def main() -> None:
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
