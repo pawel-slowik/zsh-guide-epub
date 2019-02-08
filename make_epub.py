@@ -68,10 +68,10 @@ def create_ncx(chapters, uuid):
         ("maxPageNumber", "0"),
     ]
     for meta_name, meta_content in dtb_meta:
-        e = soup.new_tag('meta')
-        e['name'] = 'dtb:' + meta_name
-        e['content'] = meta_content
-        head.append(e)
+        meta = soup.new_tag('meta')
+        meta['name'] = 'dtb:' + meta_name
+        meta['content'] = meta_content
+        head.append(meta)
     ncx.append(head)
 
     title = soup.new_tag('docTitle')
@@ -81,18 +81,18 @@ def create_ncx(chapters, uuid):
     ncx.append(title)
 
     nav_map = soup.new_tag('navMap')
-    for c in chapters:
-        nav_number = c.number + 1
+    for chapter in chapters:
+        nav_number = chapter.number + 1
         nav_point = soup.new_tag('navPoint')
         nav_point['id'] = "navpoint-%d" % nav_number
         nav_point['playOrder'] = nav_number
         nav_map.append(nav_point)
         nav_label = soup.new_tag('navLabel')
         nav_text = soup.new_tag('text')
-        nav_text.append(c.title)
+        nav_text.append(chapter.title)
         nav_label.append(nav_text)
         nav_point.append(nav_label)
-        nav_point.append(soup.new_tag('content', src=c.outname))
+        nav_point.append(soup.new_tag('content', src=chapter.outname))
     ncx.append(nav_map)
     return 'OEBPS/toc.ncx', str(soup)
 
@@ -117,8 +117,8 @@ def create_opf(chapters, uuid):
     identifier.append(uuid)
     language = soup.new_tag('dc:language')
     language.append('en-US')
-    for e in title, creator, identifier, language:
-        metadata.append(e)
+    for element in title, creator, identifier, language:
+        metadata.append(element)
 
     manifest = soup.new_tag('manifest')
     spine = soup.new_tag('spine', toc="ncx")
@@ -129,11 +129,11 @@ def create_opf(chapters, uuid):
     }
     item_ncx = soup.new_tag('item', **item_ncx_attrs)
     manifest.append(item_ncx)
-    for c in chapters:
-        file_id = os.path.splitext(c.outname)[0]
+    for chapter in chapters:
+        file_id = os.path.splitext(chapter.outname)[0]
         item_attrs = {
             'id': file_id,
-            'href': c.outname,
+            'href': chapter.outname,
             'media-type': "application/xhtml+xml",
         }
         item = soup.new_tag('item', **item_attrs)
@@ -141,13 +141,13 @@ def create_opf(chapters, uuid):
         ref_attrs = {
             'idref': file_id,
         }
-        if c.number == 0:
+        if chapter.number == 0:
             ref_attrs['linear'] = 'no'
         ref = soup.new_tag('itemref', **ref_attrs)
         spine.append(ref)
 
-    for e in metadata, manifest, spine:
-        package.append(e)
+    for element in metadata, manifest, spine:
+        package.append(element)
     return 'OEBPS/content.opf', str(soup)
 
 def create_mime():
@@ -194,11 +194,11 @@ def main():
     epub = zipfile.ZipFile('zsh-guide.epub', 'w')
     for filename, contents in epub_contents:
         compress = filename != 'mimetype'
-        ct = zipfile.ZIP_DEFLATED if compress else zipfile.ZIP_STORED
+        compression_type = zipfile.ZIP_DEFLATED if compress else zipfile.ZIP_STORED
         # the mimetype file must not be compressed; this allows non-ZIP
         # utilities to discover the mimetype by reading the raw bytes
         # from the EPUB file
-        epub.writestr(filename, contents.encode('utf-8'), ct)
+        epub.writestr(filename, contents.encode('utf-8'), compression_type)
 
 if __name__ == '__main__':
     main()

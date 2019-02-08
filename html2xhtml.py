@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import bs4
 
-doctypes = {
+DOCTYPES = {
     '1.0': (
         'html',
         '-//W3C//DTD XHTML 1.0 Strict//EN',
@@ -26,9 +26,9 @@ def html2xhtml(html, version='1.1'):
     return str(soup)
 
 def set_doctype(soup, version):
-    if version not in doctypes:
+    if version not in DOCTYPES:
         raise ValueError('unsupported version: %s' % version)
-    new_doctype = bs4.Doctype.for_name_and_ids(*doctypes[version])
+    new_doctype = bs4.Doctype.for_name_and_ids(*DOCTYPES[version])
     for item in soup.contents:
         if isinstance(item, bs4.Doctype):
             item.replaceWith('')
@@ -60,33 +60,33 @@ def set_charset(soup):
 def remove_empty_paragraphs(soup):
 
     def is_empty(tag):
-        for c in tag.children:
-            if isinstance(c, bs4.element.Tag):
+        for child in tag.children:
+            if isinstance(child, bs4.element.Tag):
                 return False
-            if isinstance(c, bs4.element.NavigableString):
-                if c.strip() != '':
+            if isinstance(child, bs4.element.NavigableString):
+                if child.strip() != '':
                     return False
                 continue
             return False
         return True
 
-    for e in soup.find_all('p'):
-        if is_empty(e):
-            e.decompose()
+    for element in soup.find_all('p'):
+        if is_empty(element):
+            element.decompose()
 
 def convert_name_to_id(soup):
-    for a in soup.html.find_all('a'):
-        if a.has_attr('name'):
-            a['id'] = a['name']
-            del a['name']
+    for anchor in soup.html.find_all('a'):
+        if anchor.has_attr('name'):
+            anchor['id'] = anchor['name']
+            del anchor['name']
 
 def wrap_body(soup):
     wrapper = soup.new_tag('div')
     saved = list(soup.body.children)
     soup.body.clear()
     soup.body.append(wrapper)
-    for s in saved:
-        wrapper.append(s)
+    for saved_element in saved:
+        wrapper.append(saved_element)
 
 def main():
     import argparse
@@ -107,7 +107,7 @@ def main():
         '-x',
         dest='version',
         required=False,
-        choices=list(doctypes.keys()),
+        choices=list(DOCTYPES.keys()),
         default='1.1',
         help='XHTML version'
     )
