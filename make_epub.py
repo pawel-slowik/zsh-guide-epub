@@ -42,7 +42,7 @@ def list_archive_chapters(archive: bytes) -> Iterable[Chapter]:
             continue
         chapters.append(Chapter(
             tarinfo.name,
-            tar.extractfile(tarinfo).read()
+            tar.extractfile(tarinfo).read() # type: ignore
         ))
     tar.close()
     chapters.sort(key=lambda x: x.number)
