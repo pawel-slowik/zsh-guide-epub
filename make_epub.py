@@ -186,28 +186,9 @@ def create_opf(book: Book, uuid: str) -> Tuple[str, str]:
     package = soup.new_tag('package', **package_attrs)
     soup.append(package)
 
-    metadata = soup.new_tag('metadata')
-    title = soup.new_tag('dc:title')
-    title.append(book.metadata.title)
-    creator = soup.new_tag('dc:creator')
-    creator.append(book.metadata.author)
-    identifier = soup.new_tag('dc:identifier')
-    identifier['id'] = "bookid"
-    identifier.append(uuid)
-    language = soup.new_tag('dc:language')
-    language.append('en-US')
-    for element in title, creator, identifier, language:
-        metadata.append(element)
-
-    manifest = soup.new_tag('manifest')
+    metadata = create_opf_metadata(soup, book.metadata, uuid)
+    manifest = begin_opf_manifest(soup)
     spine = soup.new_tag('spine', toc="ncx")
-    item_ncx_attrs = {
-        'id': "ncx",
-        'href': "toc.ncx",
-        'media-type': "application/x-dtbncx+xml",
-    }
-    item_ncx = soup.new_tag('item', **item_ncx_attrs)
-    manifest.append(item_ncx)
     for chapter in book.chapters:
         file_id = os.path.splitext(chapter.outname)[0]
         item_attrs = {
@@ -226,6 +207,36 @@ def create_opf(book: Book, uuid: str) -> Tuple[str, str]:
     for element in metadata, manifest, spine:
         package.append(element)
     return 'OEBPS/content.opf', str(soup)
+
+def create_opf_metadata(
+        soup: bs4.BeautifulSoup,
+        metadata: Metadata,
+        uuid: str,
+) -> bs4.element.Tag:
+    opf_metadata = soup.new_tag('metadata')
+    title = soup.new_tag('dc:title')
+    title.append(metadata.title)
+    creator = soup.new_tag('dc:creator')
+    creator.append(metadata.author)
+    identifier = soup.new_tag('dc:identifier')
+    identifier['id'] = "bookid"
+    identifier.append(uuid)
+    language = soup.new_tag('dc:language')
+    language.append('en-US')
+    for element in title, creator, identifier, language:
+        opf_metadata.append(element)
+    return opf_metadata
+
+def begin_opf_manifest(soup: bs4.BeautifulSoup) -> bs4.element.Tag:
+    manifest = soup.new_tag('manifest')
+    item_ncx_attrs = {
+        'id': "ncx",
+        'href': "toc.ncx",
+        'media-type': "application/x-dtbncx+xml",
+    }
+    item_ncx = soup.new_tag('item', **item_ncx_attrs)
+    manifest.append(item_ncx)
+    return manifest
 
 def create_mime() -> Tuple[str, str]:
     return 'mimetype', 'application/epub+zip'
