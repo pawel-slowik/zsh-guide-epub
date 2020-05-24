@@ -97,7 +97,15 @@ def create_ncx(book: Book, uuid: str) -> Tuple[str, str]:
         version="2005-1"
     )
     soup.append(ncx)
+    ncx.append(create_ncx_head(soup, uuid))
+    ncx.append(create_ncx_title(soup, book.metadata))
+    ncx.append(create_ncx_nav_map(soup, book.chapters))
+    return 'OEBPS/toc.ncx', str(soup)
 
+def create_ncx_head(
+        soup: bs4.BeautifulSoup,
+        uuid: str,
+) -> bs4.element.Tag:
     head = soup.new_tag('head')
     dtb_meta = [
         ("uid", "urn:uuid:" + uuid),
@@ -110,18 +118,26 @@ def create_ncx(book: Book, uuid: str) -> Tuple[str, str]:
         meta['name'] = 'dtb:' + meta_name
         meta['content'] = meta_content
         head.append(meta)
-    ncx.append(head)
+    return head
 
+def create_ncx_title(
+        soup: bs4.BeautifulSoup,
+        metadata: Metadata,
+) -> bs4.element.Tag:
     title = soup.new_tag('docTitle')
     text = soup.new_tag('text')
-    text.append(book.metadata.title)
+    text.append(metadata.title)
     title.append(text)
-    ncx.append(title)
+    return title
 
-    nav_number = 1
+def create_ncx_nav_map(
+        soup: bs4.BeautifulSoup,
+        chapters: Iterable[Chapter],
+) -> bs4.element.Tag:
     nav_map = soup.new_tag('navMap')
-    for chapter in book.chapters:
-        nav_point = create_nav_point(
+    nav_number = 1
+    for chapter in chapters:
+        nav_point = create_ncx_nav_point(
             soup,
             nav_number,
             chapter.title,
@@ -132,7 +148,7 @@ def create_ncx(book: Book, uuid: str) -> Tuple[str, str]:
         chapter_soup = bs4.BeautifulSoup(chapter.xhtml, 'lxml')
         titles = chapter_soup.find_all('h2')
         for title in titles:
-            sub_nav_point = create_nav_point(
+            sub_nav_point = create_ncx_nav_point(
                 soup,
                 nav_number,
                 title.text,
@@ -140,11 +156,9 @@ def create_ncx(book: Book, uuid: str) -> Tuple[str, str]:
             )
             nav_point.append(sub_nav_point)
             nav_number += 1
+    return nav_map
 
-    ncx.append(nav_map)
-    return 'OEBPS/toc.ncx', str(soup)
-
-def create_nav_point(
+def create_ncx_nav_point(
         soup: bs4.BeautifulSoup,
         nav_number: int,
         title: str,
