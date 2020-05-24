@@ -6,33 +6,82 @@ import zipfile
 import re
 import os.path
 import urllib.request
-from typing import Tuple, Optional, Iterable
+from typing import Tuple, Iterable
 import bs4
 from html2xhtml import html2xhtml
 
+class Metadata:
+
+    def __init__(self, title: str, author: str):
+        self.title = title
+        self.author = author
+
+    @classmethod
+    def from_html(cls, html: bytes) -> "Metadata":
+        body = bs4.BeautifulSoup(html, "lxml").html.body
+        return cls(
+            title=str(body.find_all("h1")[0].text),
+            author=str(body.h2.text),
+        )
+
 class Chapter():
 
-    def __init__(self, filename: str, html: bytes) -> None:
-        self.xhtml = html2xhtml(html)
-        self.xhtml = remove_html_toc_references(self.xhtml)
-        self.outname = os.path.basename(filename)
-        match = re.search(r'([0-9]+)\.html$', self.outname)
-        self.number = 0 if match is None else int(match.group(1))
-        soup = bs4.BeautifulSoup(self.xhtml, 'lxml')
-        body = soup.html.body
-        self.title = str(body.find_all('h1')[-1].text)
-        self.book_title: Optional[str]
-        self.book_author: Optional[str]
-        if self.number == 0:
-            self.book_title = str(body.find_all('h1')[0].text)
-            self.book_author = str(body.h2.text)
-        else:
-            self.book_title = None
-            self.book_author = None
+    def __init__(self, title: str, number: int, filename: str, xhtml: str):
+        self.title = title
+        self.number = number
+        self.outname = filename
+        self.xhtml = xhtml
 
-def remove_html_toc_references(html: str) -> str:
+    @classmethod
+    def from_html(cls, filename: str, xhtml: str) -> "Chapter":
+        title = str(bs4.BeautifulSoup(xhtml, "lxml").html.body.find_all("h1")[-1].text)
+        outname = os.path.basename(filename)
+        match = re.search(r"([0-9]+)\.html$", outname)
+        if match is None:
+            raise ValueError
+        number = int(match.group(1))
+        return cls(title, number, outname, xhtml)
+
+class Book:
+
+    def __init__(self, metadata: Metadata, chapters: Iterable[Chapter]):
+        self.metadata = metadata
+        self.chapters = tuple(chapters)
+
+    @classmethod
+    def from_tar_archive(cls, archive: bytes) -> "Book":
+        html_toc_filename = "zshguide.html"
+        metadata = None
+        chapters = []
+        tar = tarfile.open(fileobj=io.BytesIO(archive))
+        for tarinfo in tar:
+            if not tarinfo.isreg():
+                continue
+            if os.path.basename(tarinfo.name) == html_toc_filename:
+                metadata = Metadata.from_html(
+                    tar.extractfile(tarinfo).read() # type: ignore
+                )
+                continue
+            if re.search(r"zshguide([0-9]{2})\.html$", tarinfo.name):
+                chapters.append(Chapter.from_html(
+                    tarinfo.name,
+                    remove_html_toc_references(
+                        html2xhtml(
+                            tar.extractfile(tarinfo).read() # type: ignore
+                        ),
+                        html_toc_filename
+                    )
+                ))
+                continue
+        tar.close()
+        if metadata is None:
+            raise ValueError
+        chapters.sort(key=lambda x: x.number)
+        return cls(metadata, chapters)
+
+def remove_html_toc_references(html: str, toc_filename: str) -> str:
     soup = bs4.BeautifulSoup(html, 'lxml')
-    toc_links = soup.find_all("a", {"href": "zshguide.html"})
+    toc_links = soup.find_all("a", {"href": toc_filename})
     for toc_link in toc_links:
         if toc_link.parent.name == "li":
             toc_link.parent.decompose()
@@ -40,26 +89,7 @@ def remove_html_toc_references(html: str) -> str:
             raise ValueError
     return str(soup)
 
-def list_archive_chapters(archive: bytes) -> Iterable[Chapter]:
-    tar = tarfile.open(fileobj=io.BytesIO(archive))
-    chapters = []
-    for tarinfo in tar:
-        if not tarinfo.isreg():
-            continue
-        if not re.search(
-                r'zshguide([0-9]{2}){0,1}\.html$',
-                tarinfo.name
-        ):
-            continue
-        chapters.append(Chapter(
-            tarinfo.name,
-            tar.extractfile(tarinfo).read() # type: ignore
-        ))
-    tar.close()
-    chapters.sort(key=lambda x: x.number)
-    return chapters
-
-def create_ncx(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
+def create_ncx(book: Book, uuid: str) -> Tuple[str, str]:
     soup = bs4.BeautifulSoup('', 'lxml-xml')
     doctype = bs4.Doctype.for_name_and_ids(
         'ncx',
@@ -90,15 +120,13 @@ def create_ncx(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
 
     title = soup.new_tag('docTitle')
     text = soup.new_tag('text')
-    text.append(get_book_title(chapters))
+    text.append(book.metadata.title)
     title.append(text)
     ncx.append(title)
 
     nav_number = 1
     nav_map = soup.new_tag('navMap')
-    for chapter in chapters:
-        if chapter.number == 0:
-            continue
+    for chapter in book.chapters:
         nav_point = soup.new_tag('navPoint')
         nav_point['id'] = "navpoint-%d" % nav_number
         nav_point['playOrder'] = nav_number
@@ -129,7 +157,7 @@ def create_ncx(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
     ncx.append(nav_map)
     return 'OEBPS/toc.ncx', str(soup)
 
-def create_opf(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
+def create_opf(book: Book, uuid: str) -> Tuple[str, str]:
     soup = bs4.BeautifulSoup('', 'lxml-xml')
     package_attrs = {
         'xmlns': "http://www.idpf.org/2007/opf",
@@ -142,9 +170,9 @@ def create_opf(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
 
     metadata = soup.new_tag('metadata')
     title = soup.new_tag('dc:title')
-    title.append(get_book_title(chapters))
+    title.append(book.metadata.title)
     creator = soup.new_tag('dc:creator')
-    creator.append(get_book_author(chapters))
+    creator.append(book.metadata.author)
     identifier = soup.new_tag('dc:identifier')
     identifier['id'] = "bookid"
     identifier.append(uuid)
@@ -162,9 +190,7 @@ def create_opf(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
     }
     item_ncx = soup.new_tag('item', **item_ncx_attrs)
     manifest.append(item_ncx)
-    for chapter in chapters:
-        if chapter.number == 0:
-            continue
+    for chapter in book.chapters:
         file_id = os.path.splitext(chapter.outname)[0]
         item_attrs = {
             'id': file_id,
@@ -204,22 +230,14 @@ def create_container() -> Tuple[str, str]:
     soup.append(container)
     return 'META-INF/container.xml', str(soup)
 
-def get_book_title(chapters: Iterable[Chapter]) -> str:
-    titles = [c.book_title for c in chapters if c.book_title is not None]
-    return ' '.join(set(titles))
-
-def get_book_author(chapters: Iterable[Chapter]) -> str:
-    authors = [c.book_author for c in chapters if c.book_author is not None]
-    return ' '.join(set(authors))
-
 def main() -> None:
     guide_url = 'http://zsh.sourceforge.net/Guide/'
     tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
     archive = urllib.request.urlopen(tarball_url).read()
-    chapters = list_archive_chapters(archive)
-    epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in chapters if c.number != 0]
-    epub_contents.append(create_ncx(chapters, guide_url))
-    epub_contents.append(create_opf(chapters, guide_url))
+    book = Book.from_tar_archive(archive)
+    epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in book.chapters]
+    epub_contents.append(create_ncx(book, guide_url))
+    epub_contents.append(create_opf(book, guide_url))
     # the first file in the archive must be the mimetype file
     epub_contents.insert(0, create_mime())
     epub_contents.append(create_container())
