@@ -6,78 +6,72 @@ import zipfile
 import re
 import os.path
 import urllib.request
-from typing import Tuple, Iterable
+from typing import Tuple, NamedTuple, Iterable
 import bs4
 from html2xhtml import html2xhtml
 
-class Metadata:
+Metadata = NamedTuple("Metadata", [
+    ("title", str),
+    ("author", str),
+])
 
-    def __init__(self, title: str, author: str):
-        self.title = title
-        self.author = author
+Chapter = NamedTuple("Chapter", [
+    ("title", str),
+    ("number", int),
+    ("outname", str),
+    ("xhtml", str),
+])
 
-    @classmethod
-    def from_html(cls, html: bytes) -> "Metadata":
-        body = bs4.BeautifulSoup(html, "lxml").html.body
-        return cls(
-            title=str(body.find_all("h1")[0].text),
-            author=str(body.h2.text),
-        )
+Book = NamedTuple("Book", [
+    ("metadata", Metadata),
+    ("chapters", Iterable[Chapter]),
+])
 
-class Chapter():
+def metadata_from_html(html: bytes) -> Metadata:
+    body = bs4.BeautifulSoup(html, "lxml").html.body
+    return Metadata(
+        title=str(body.find_all("h1")[0].text),
+        author=str(body.h2.text),
+    )
 
-    def __init__(self, title: str, number: int, filename: str, xhtml: str):
-        self.title = title
-        self.number = number
-        self.outname = filename
-        self.xhtml = xhtml
+def chapter_from_html(filename: str, xhtml: str) -> Chapter:
+    title = str(bs4.BeautifulSoup(xhtml, "lxml").html.body.find_all("h1")[-1].text)
+    outname = os.path.basename(filename)
+    match = re.search(r"([0-9]+)\.html$", outname)
+    if match is None:
+        raise ValueError
+    number = int(match.group(1))
+    return Chapter(title, number, outname, xhtml)
 
-    @classmethod
-    def from_html(cls, filename: str, xhtml: str) -> "Chapter":
-        title = str(bs4.BeautifulSoup(xhtml, "lxml").html.body.find_all("h1")[-1].text)
-        outname = os.path.basename(filename)
-        match = re.search(r"([0-9]+)\.html$", outname)
-        if match is None:
-            raise ValueError
-        number = int(match.group(1))
-        return cls(title, number, outname, xhtml)
-
-class Book:
-
-    def __init__(self, metadata: Metadata, chapters: Iterable[Chapter]):
-        self.metadata = metadata
-        self.chapters = tuple(chapters)
-
-    @classmethod
-    def from_tar_archive(cls, archive: bytes) -> "Book":
-        html_toc_filename = "zshguide.html"
-        metadata = None
-        chapters = []
-        tar = tarfile.open(fileobj=io.BytesIO(archive))
-        for tarinfo in tar:
-            if not tarinfo.isreg():
-                continue
-            if os.path.basename(tarinfo.name) == html_toc_filename:
-                metadata = Metadata.from_html(
-                    tar.extractfile(tarinfo).read() # type: ignore
+def book_from_tar_archive(archive: bytes) -> Book:
+    html_toc_filename = "zshguide.html"
+    metadata = None
+    chapters = []
+    tar = tarfile.open(fileobj=io.BytesIO(archive))
+    for tarinfo in tar:
+        if not tarinfo.isreg():
+            continue
+        if os.path.basename(tarinfo.name) == html_toc_filename:
+            metadata = metadata_from_html(
+                tar.extractfile(tarinfo).read() # type: ignore
+            )
+            continue
+        if re.search(r"zshguide([0-9]{2})\.html$", tarinfo.name):
+            chapters.append(chapter_from_html(
+                tarinfo.name,
+                remove_html_toc_references(
+                    html2xhtml(
+                        tar.extractfile(tarinfo).read() # type: ignore
+                    ),
+                    html_toc_filename
                 )
-                continue
-            if re.search(r"zshguide([0-9]{2})\.html$", tarinfo.name):
-                chapters.append(Chapter.from_html(
-                    tarinfo.name,
-                    remove_html_toc_references(
-                        html2xhtml(
-                            tar.extractfile(tarinfo).read() # type: ignore
-                        ),
-                        html_toc_filename
-                    )
-                ))
-                continue
-        tar.close()
-        if metadata is None:
-            raise ValueError
-        chapters.sort(key=lambda x: x.number)
-        return cls(metadata, chapters)
+            ))
+            continue
+    tar.close()
+    if metadata is None:
+        raise ValueError
+    chapters.sort(key=lambda x: x.number)
+    return Book(metadata, tuple(chapters))
 
 def remove_html_toc_references(html: str, toc_filename: str) -> str:
     soup = bs4.BeautifulSoup(html, 'lxml')
@@ -234,7 +228,7 @@ def main() -> None:
     guide_url = 'http://zsh.sourceforge.net/Guide/'
     tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
     archive = urllib.request.urlopen(tarball_url).read()
-    book = Book.from_tar_archive(archive)
+    book = book_from_tar_archive(archive)
     epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in book.chapters]
     epub_contents.append(create_ncx(book, guide_url))
     epub_contents.append(create_opf(book, guide_url))
