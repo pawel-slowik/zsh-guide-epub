@@ -14,6 +14,7 @@ class Chapter():
 
     def __init__(self, filename: str, html: bytes) -> None:
         self.xhtml = html2xhtml(html)
+        self.xhtml = remove_html_toc_references(self.xhtml)
         self.outname = os.path.basename(filename)
         match = re.search(r'([0-9]+)\.html$', self.outname)
         self.number = 0 if match is None else int(match.group(1))
@@ -28,6 +29,16 @@ class Chapter():
         else:
             self.book_title = None
             self.book_author = None
+
+def remove_html_toc_references(html: str) -> str:
+    soup = bs4.BeautifulSoup(html, 'lxml')
+    toc_links = soup.find_all("a", {"href": "zshguide.html"})
+    for toc_link in toc_links:
+        if toc_link.parent.name == "li":
+            toc_link.parent.decompose()
+        else:
+            raise ValueError
+    return str(soup)
 
 def list_archive_chapters(archive: bytes) -> Iterable[Chapter]:
     tar = tarfile.open(fileobj=io.BytesIO(archive))
@@ -83,12 +94,15 @@ def create_ncx(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
     title.append(text)
     ncx.append(title)
 
+    nav_number = 1
     nav_map = soup.new_tag('navMap')
     for chapter in chapters:
-        nav_number = chapter.number + 1
+        if chapter.number == 0:
+            continue
         nav_point = soup.new_tag('navPoint')
         nav_point['id'] = "navpoint-%d" % nav_number
         nav_point['playOrder'] = nav_number
+        nav_number += 1
         nav_map.append(nav_point)
         nav_label = soup.new_tag('navLabel')
         nav_text = soup.new_tag('text')
@@ -96,6 +110,22 @@ def create_ncx(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
         nav_label.append(nav_text)
         nav_point.append(nav_label)
         nav_point.append(soup.new_tag('content', src=chapter.outname))
+        chapter_soup = bs4.BeautifulSoup(chapter.xhtml, 'lxml')
+        titles = chapter_soup.find_all('h2')
+        for title in titles:
+            title_link_id = title.previous_sibling.a['id']
+            sub_nav_point = soup.new_tag('navPoint')
+            sub_nav_point['id'] = "navpoint-%d" % nav_number
+            sub_nav_point['playOrder'] = nav_number
+            nav_number += 1
+            sub_nav_label = soup.new_tag('navLabel')
+            sub_nav_text = soup.new_tag('text')
+            sub_nav_text.append(title.text)
+            sub_nav_label.append(sub_nav_text)
+            sub_nav_point.append(sub_nav_label)
+            sub_nav_point.append(soup.new_tag('content', src=chapter.outname + '#' + title_link_id))
+            nav_point.append(sub_nav_point)
+
     ncx.append(nav_map)
     return 'OEBPS/toc.ncx', str(soup)
 
@@ -133,6 +163,8 @@ def create_opf(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
     item_ncx = soup.new_tag('item', **item_ncx_attrs)
     manifest.append(item_ncx)
     for chapter in chapters:
+        if chapter.number == 0:
+            continue
         file_id = os.path.splitext(chapter.outname)[0]
         item_attrs = {
             'id': file_id,
@@ -144,8 +176,6 @@ def create_opf(chapters: Iterable[Chapter], uuid: str) -> Tuple[str, str]:
         ref_attrs = {
             'idref': file_id,
         }
-        if chapter.number == 0:
-            ref_attrs['linear'] = 'no'
         ref = soup.new_tag('itemref', **ref_attrs)
         spine.append(ref)
 
@@ -187,7 +217,7 @@ def main() -> None:
     tarball_url = 'http://zsh.sourceforge.net/Guide/zshguide_html.tar.gz'
     archive = urllib.request.urlopen(tarball_url).read()
     chapters = list_archive_chapters(archive)
-    epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in chapters]
+    epub_contents = [('OEBPS/' + c.outname, c.xhtml) for c in chapters if c.number != 0]
     epub_contents.append(create_ncx(chapters, guide_url))
     epub_contents.append(create_opf(chapters, guide_url))
     # the first file in the archive must be the mimetype file
