@@ -121,35 +121,45 @@ def create_ncx(book: Book, uuid: str) -> Tuple[str, str]:
     nav_number = 1
     nav_map = soup.new_tag('navMap')
     for chapter in book.chapters:
-        nav_point = soup.new_tag('navPoint')
-        nav_point['id'] = "navpoint-%d" % nav_number
-        nav_point['playOrder'] = nav_number
-        nav_number += 1
+        nav_point = create_nav_point(
+            soup,
+            nav_number,
+            chapter.title,
+            chapter.outname,
+        )
         nav_map.append(nav_point)
-        nav_label = soup.new_tag('navLabel')
-        nav_text = soup.new_tag('text')
-        nav_text.append(chapter.title)
-        nav_label.append(nav_text)
-        nav_point.append(nav_label)
-        nav_point.append(soup.new_tag('content', src=chapter.outname))
+        nav_number += 1
         chapter_soup = bs4.BeautifulSoup(chapter.xhtml, 'lxml')
         titles = chapter_soup.find_all('h2')
         for title in titles:
-            title_link_id = title.previous_sibling.a['id']
-            sub_nav_point = soup.new_tag('navPoint')
-            sub_nav_point['id'] = "navpoint-%d" % nav_number
-            sub_nav_point['playOrder'] = nav_number
-            nav_number += 1
-            sub_nav_label = soup.new_tag('navLabel')
-            sub_nav_text = soup.new_tag('text')
-            sub_nav_text.append(title.text)
-            sub_nav_label.append(sub_nav_text)
-            sub_nav_point.append(sub_nav_label)
-            sub_nav_point.append(soup.new_tag('content', src=chapter.outname + '#' + title_link_id))
+            sub_nav_point = create_nav_point(
+                soup,
+                nav_number,
+                title.text,
+                chapter.outname + '#' + title.previous_sibling.a['id'],
+            )
             nav_point.append(sub_nav_point)
+            nav_number += 1
 
     ncx.append(nav_map)
     return 'OEBPS/toc.ncx', str(soup)
+
+def create_nav_point(
+        soup: bs4.BeautifulSoup,
+        nav_number: int,
+        title: str,
+        src: str
+) -> bs4.element.Tag:
+    nav_point = soup.new_tag("navPoint")
+    nav_point["id"] = "navpoint-%d" % nav_number
+    nav_point["playOrder"] = nav_number
+    nav_label = soup.new_tag("navLabel")
+    nav_text = soup.new_tag("text")
+    nav_text.append(title)
+    nav_label.append(nav_text)
+    nav_point.append(nav_label)
+    nav_point.append(soup.new_tag("content", src=src))
+    return nav_point
 
 def create_opf(book: Book, uuid: str) -> Tuple[str, str]:
     soup = bs4.BeautifulSoup('', 'lxml-xml')
